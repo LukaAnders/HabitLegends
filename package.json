@@ -6,11 +6,14 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "firebase:check": "node scripts/check-firebase-connection.mjs",
+    "seed:store": "node scripts/seed-store.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
+    "firebase": "^12.16.0",
     "framer-motion": "latest",
     "lucide-react": "latest",
     "react": "latest",
@@ -26,6 +29,7 @@
     "eslint": "latest",
     "eslint-plugin-react-hooks": "latest",
     "eslint-plugin-react-refresh": "latest",
+    "firebase-admin": "^14.2.0",
     "globals": "latest",
     "postcss": "latest",
     "tailwindcss": "^3.4.17",

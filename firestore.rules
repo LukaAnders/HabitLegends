@@ -1,0 +1,101 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function ownsUser(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function validDifficultyReward(data) {
+      return (data.difficulty == 'common' && data.xpReward == 40 && data.goldReward == 15)
+        || (data.difficulty == 'rare' && data.xpReward == 90 && data.goldReward == 35)
+        || (data.difficulty == 'epic' && data.xpReward == 150 && data.goldReward == 60)
+        || (data.difficulty == 'legendary' && data.xpReward == 250 && data.goldReward == 100);
+    }
+
+    function validTask(data, userId) {
+      return data.keys().hasAll([
+          'userId', 'title', 'description', 'category', 'difficulty', 'frequency',
+          'xpReward', 'goldReward', 'isActive', 'createdAt', 'updatedAt'
+        ])
+        && data.userId == userId
+        && data.title is string && data.title.size() >= 2 && data.title.size() <= 80
+        && data.description is string && data.description.size() <= 240
+        && data.category is string
+        && data.difficulty in ['common', 'rare', 'epic', 'legendary']
+        && data.frequency in ['once', 'daily', 'weekly']
+        && data.isActive is bool
+        && data.xpReward is int && data.goldReward is int
+        && validDifficultyReward(data);
+    }
+
+    function validCompletion(data) {
+      return data.keys().hasAll([
+          'taskId', 'taskTitle', 'difficulty', 'category', 'xpEarned',
+          'goldEarned', 'levelBonusGold', 'periodKey', 'completedAt'
+        ])
+        && data.taskId is string && data.taskTitle is string
+        && data.category is string && data.periodKey is string
+        && data.difficulty in ['common', 'rare', 'epic', 'legendary']
+        && data.xpEarned is int && data.goldEarned is int && data.levelBonusGold is int
+        && data.levelBonusGold >= 0
+        && ((data.difficulty == 'common' && data.xpEarned == 40 && data.goldEarned == 15)
+          || (data.difficulty == 'rare' && data.xpEarned == 90 && data.goldEarned == 35)
+          || (data.difficulty == 'epic' && data.xpEarned == 150 && data.goldEarned == 60)
+          || (data.difficulty == 'legendary' && data.xpEarned == 250 && data.goldEarned == 100));
+    }
+
+    function validInventoryItem(data, itemId) {
+      return data.keys().hasAll([
+          'itemId', 'name', 'category', 'rarity', 'imageUrl',
+          'purchasedPrice', 'purchasedAt', 'equipped'
+        ])
+        && data.itemId == itemId && data.name is string && data.imageUrl is string
+        && data.category in ['hair', 'outfit', 'weapon', 'accessory', 'pet', 'background']
+        && data.rarity in ['common', 'rare', 'epic', 'legendary']
+        && data.purchasedPrice is int && data.purchasedPrice >= 0
+        && data.equipped == false;
+    }
+
+    match /users/{userId} {
+      allow create: if ownsUser(userId);
+      allow read, update, delete: if ownsUser(userId);
+
+      match /tasks/{taskId} {
+        allow read: if ownsUser(userId);
+        allow create: if ownsUser(userId) && validTask(request.resource.data, userId);
+        allow update: if ownsUser(userId)
+          && validTask(request.resource.data, userId)
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if ownsUser(userId);
+      }
+
+      match /taskCompletions/{completionId} {
+        allow read: if ownsUser(userId);
+        allow create: if ownsUser(userId) && validCompletion(request.resource.data);
+        allow update, delete: if false;
+      }
+
+      match /inventory/{itemId} {
+        allow read: if ownsUser(userId);
+        allow create: if ownsUser(userId) && validInventoryItem(request.resource.data, itemId);
+        allow update, delete: if false;
+      }
+    }
+
+    match /questTemplates/{questId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /storeItems/{itemId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+  }
+}

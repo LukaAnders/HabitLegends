@@ -8,7 +8,7 @@ export type Rarity = 'Comum' | 'Raro' | 'Épico' | 'Lendário'
 export type QuestState = 'Disponível' | 'Em andamento' | 'Concluída'
 export type JourneyState = 'completed' | 'active' | 'locked'
 export interface NavItem { label: string; icon: LucideIcon; path: string }
-export interface Quest { id: number; name: string; description: string; category: string; difficulty: Rarity; xp: number; gold: number; icon: LucideIcon; state: QuestState; featured?: boolean; completed?: boolean }
+export interface Quest { id: string; name: string; description: string; category: string; difficulty: Rarity; xp: number; gold: number; icon: LucideIcon; state: QuestState; featured?: boolean; completed?: boolean }
 export interface MarketItem { id: number; name: string; type: string; rarity: Rarity; price: number; icon: LucideIcon; accent: string; level?: number }
 export interface JourneyNode { name: string; subtitle: string; state: JourneyState; icon: LucideIcon }
 
@@ -22,10 +22,10 @@ export const navigation: NavItem[] = [
 export const hero = { userName: 'Luka', characterName: 'Aerendil', title: 'Guardião do Alvorecer', level: 12, xp: 2840, nextLevelXp: 3500, gold: 1280, streak: 14 }
 
 export const quests: Quest[] = [
-  { id: 3, name: 'Crônicas do Conhecimento', description: 'Estude por uma hora e fortaleça sua inteligência.', category: 'Estudos', difficulty: 'Épico', xp: 150, gold: 60, icon: BookOpen, state: 'Disponível', featured: true },
-  { id: 1, name: 'Ritual do Despertar', description: 'Comece o dia com intenção e energia.', category: 'Bem-estar', difficulty: 'Comum', xp: 40, gold: 15, icon: Flame, state: 'Disponível' },
-  { id: 2, name: 'Forje Corpo e Mente', description: 'Treine por pelo menos trinta minutos.', category: 'Exercício', difficulty: 'Raro', xp: 90, gold: 35, icon: Dumbbell, state: 'Em andamento' },
-  { id: 4, name: 'A Hora Inabalável', description: 'Complete uma sessão de foco profundo.', category: 'Foco', difficulty: 'Lendário', xp: 250, gold: 100, icon: Target, state: 'Disponível' },
+  { id: 'mock-3', name: 'Crônicas do Conhecimento', description: 'Estude por uma hora e fortaleça sua inteligência.', category: 'Estudos', difficulty: 'Épico', xp: 150, gold: 60, icon: BookOpen, state: 'Disponível', featured: true },
+  { id: 'mock-1', name: 'Ritual do Despertar', description: 'Comece o dia com intenção e energia.', category: 'Bem-estar', difficulty: 'Comum', xp: 40, gold: 15, icon: Flame, state: 'Disponível' },
+  { id: 'mock-2', name: 'Forje Corpo e Mente', description: 'Treine por pelo menos trinta minutos.', category: 'Exercício', difficulty: 'Raro', xp: 90, gold: 35, icon: Dumbbell, state: 'Em andamento' },
+  { id: 'mock-4', name: 'A Hora Inabalável', description: 'Complete uma sessão de foco profundo.', category: 'Foco', difficulty: 'Lendário', xp: 250, gold: 100, icon: Target, state: 'Disponível' },
 ]
 
 export const journey: JourneyNode[] = [

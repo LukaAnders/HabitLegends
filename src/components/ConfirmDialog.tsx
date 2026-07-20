@@ -1,0 +1,4 @@
+import { AnimatePresence, motion } from 'framer-motion'
+import { AlertTriangle } from 'lucide-react'
+
+export function ConfirmDialog({ open, title, message, busy, onCancel, onConfirm }: { open: boolean; title: string; message: string; busy: boolean; onCancel: () => void; onConfirm: () => void }) { return <AnimatePresence>{open && <motion.div className="game-modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><motion.section role="alertdialog" aria-modal="true" initial={{ scale: .95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="confirm-dialog"><AlertTriangle size={30} className="text-red-400" /><h2 className="section-heading mt-3">{title}</h2><p>{message}</p><div><button onClick={onCancel} disabled={busy}>Cancelar</button><button onClick={onConfirm} disabled={busy} className="danger-button">{busy ? 'Excluindo...' : 'Excluir missão'}</button></div></motion.section></motion.div>}</AnimatePresence> }

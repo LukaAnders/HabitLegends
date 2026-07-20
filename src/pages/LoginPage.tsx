@@ -1,0 +1,14 @@
+import { useState, type FormEvent } from 'react'
+import { motion } from 'framer-motion'
+import { Eye, EyeOff, LogIn, Mail } from 'lucide-react'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { AuthLayout } from '../components/AuthLayout'
+import { useAuth } from '../contexts/auth-context'
+import { loginWithEmail, loginWithGoogle } from '../services/authService'
+import { getFriendlyFirebaseError } from '../utils/firebaseErrors'
+
+export function LoginPage() { const { user } = useAuth(); const navigate = useNavigate(); const location = useLocation(); const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [showPassword, setShowPassword] = useState(false); const [loading, setLoading] = useState(false); const [error, setError] = useState<string | null>(null); const destination = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? '/';
+  if (user) return <Navigate to="/" replace />
+  async function submit(event: FormEvent) { event.preventDefault(); setLoading(true); setError(null); try { await loginWithEmail(email, password); navigate(destination, { replace: true }) } catch (cause) { setError(getFriendlyFirebaseError(cause)) } finally { setLoading(false) } }
+  async function googleLogin() { setLoading(true); setError(null); try { await loginWithGoogle(); navigate(destination, { replace: true }) } catch (cause) { setError(getFriendlyFirebaseError(cause)) } finally { setLoading(false) } }
+  return <AuthLayout eyebrow="Portal do aventureiro" title="Retorne ao Reino" subtitle="Sua jornada, conquistas e companheiros aguardam por você."><form onSubmit={submit} className="auth-form"><label>E-mail<div className="auth-input"><Mail size={17} /><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="aventureiro@email.com" required autoComplete="email" /></div></label><label>Senha<div className="auth-input"><input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Sua senha" required autoComplete="current-password" /><button type="button" onClick={() => setShowPassword(value => !value)} aria-label="Mostrar senha">{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div></label><div className="flex justify-end"><Link className="auth-link" to="/recuperar-senha">Esqueci minha senha</Link></div>{error && <p role="alert" className="auth-error">{error}</p>}<motion.button whileTap={{ scale: .98 }} disabled={loading} className="auth-submit"><LogIn size={18} />{loading ? 'Abrindo o portal...' : 'Entrar no reino'}</motion.button></form><div className="auth-divider"><span>ou continue com</span></div><button onClick={googleLogin} disabled={loading} className="google-button"><strong>G</strong> Entrar com Google</button><p className="auth-footer">Ainda não iniciou sua lenda? <Link to="/cadastro">Criar personagem</Link></p></AuthLayout> }
