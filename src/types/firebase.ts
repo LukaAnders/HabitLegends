@@ -25,6 +25,8 @@ export interface PlayerProfile {
   longestStreak: number
   completedTasks: number
   lastActiveDate: Timestamp | null
+  lastActionId?: string
+  lastActionType?: 'completion' | 'purchase'
   avatar: PlayerAvatar
   createdAt?: Timestamp
   updatedAt?: Timestamp

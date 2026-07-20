@@ -1,12 +1,16 @@
 import { motion } from 'framer-motion'
-import { Backpack, Paintbrush, Shield, Sword } from 'lucide-react'
+import { Backpack, Paintbrush } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { LevelBadge, XpBar } from './GamePrimitives'
 import { usePlayer } from '../contexts/player-context'
+import { useInventory } from '../hooks/useInventory'
+import { AvatarRenderer } from './avatar/AvatarRenderer'
 
 const particles = Array.from({ length: 14 }, (_, i) => ({ left: `${8 + (i * 37) % 84}%`, top: `${12 + (i * 29) % 70}%`, delay: i * .28, size: i % 3 + 2 }))
 
 export function HeroStage({ bonusXp = 0 }: { bonusXp?: number }) {
   const { player } = usePlayer()
+  const { items: inventory } = useInventory()
   const xpRequired = 100 + ((player?.level ?? 1) - 1) * 50
   return <motion.section initial={{ opacity: 0, scale: .985 }} animate={{ opacity: 1, scale: 1 }} className="hero-stage">
     <div className="sky-glow" /><div className="moon" /><div className="mountains mountain-back" /><div className="mountains mountain-front" />
@@ -18,15 +22,11 @@ export function HeroStage({ bonusXp = 0 }: { bonusXp?: number }) {
         <h1 className="font-display text-3xl font-bold text-parchment sm:text-4xl">{player?.characterName ?? 'Aventureiro'}</h1>
         <p className="mt-1 font-display text-sm text-amber-200/80">{player?.title ?? 'Aventureiro Iniciante'}</p>
         <div className="mx-auto mt-5 max-w-sm lg:mx-0"><XpBar value={(player?.currentXp ?? 0) + bonusXp} max={xpRequired} /></div>
-        <div className="mt-5 flex justify-center gap-2 lg:justify-start"><button className="game-action"><Backpack size={17} /> Inventário</button><button className="game-action"><Paintbrush size={17} /> Aparência</button></div>
+        <div className="mt-5 flex justify-center gap-2 lg:justify-start"><Link to="/inventario" className="game-action"><Backpack size={17} /> Inventário</Link><Link to="/heroi" className="game-action"><Paintbrush size={17} /> Aparência</Link></div>
       </div>
       <div className="order-1 flex min-h-[340px] items-end justify-center lg:order-2 lg:min-h-[510px]">
         <div className="hero-aura" />
-        <motion.div animate={{ y: [0, -7, 0] }} transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }} className="hero-character">
-          <div className="hero-cape" /><div className="hero-head"><div className="hero-hair" /><span className="hero-eye left" /><span className="hero-eye right" /></div>
-          <div className="hero-body"><Shield className="hero-emblem" size={33} /><div className="hero-belt" /></div>
-          <div className="hero-arm left" /><div className="hero-arm right"><Sword className="hero-sword" size={105} strokeWidth={1.2} /></div><div className="hero-leg left" /><div className="hero-leg right" />
-        </motion.div>
+        {player && <motion.div animate={{ y: [0, -7, 0] }} transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }} className="layered-hero"><AvatarRenderer avatar={player.avatar} inventory={inventory} includeBackground={false} /></motion.div>}
         <div className="absolute bottom-3 z-30"><LevelBadge level={player?.level ?? 1} /></div>
       </div>
       <div className="order-3 hidden self-center justify-self-end p-8 lg:block"><div className="lore-plaque"><span className="text-gold">✦</span><p>“A disciplina transforma os pequenos atos em grandes lendas.”</p></div></div>

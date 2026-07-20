@@ -4,11 +4,11 @@ import type { HabitTask, TaskFrequency } from '../types/tasks'
 function pad(value: number) { return String(value).padStart(2, '0') }
 
 export function getLocalDateKey(date = new Date()) {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`
 }
 
 export function getWeekKey(date = new Date()) {
-  const utc = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const utc = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
   const day = utc.getUTCDay() || 7
   utc.setUTCDate(utc.getUTCDate() + 4 - day)
   const yearStart = new Date(Date.UTC(utc.getUTCFullYear(), 0, 1))
@@ -30,7 +30,8 @@ export function getStreakUpdate(currentStreak: number, longestStreak: number, la
   if (!lastActiveDate) return { streak: 1, longestStreak: Math.max(1, longestStreak) }
   const last = lastActiveDate.toDate()
   if (getLocalDateKey(last) === getLocalDateKey(now)) return { streak: currentStreak, longestStreak }
-  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 12)
+  const yesterday = new Date(now)
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1)
   const streak = getLocalDateKey(last) === getLocalDateKey(yesterday) ? currentStreak + 1 : 1
   return { streak, longestStreak: Math.max(streak, longestStreak) }
 }

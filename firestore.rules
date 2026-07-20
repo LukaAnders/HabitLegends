@@ -2,12 +2,136 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Modelo: perfis privados em users/{uid}; tarefas, conclusões e inventário
+    // pertencem ao mesmo uid. Catálogo e modelos são somente leitura no cliente.
     function signedIn() {
       return request.auth != null;
     }
 
     function ownsUser(userId) {
       return signedIn() && request.auth.uid == userId;
+    }
+
+    function validAvatarValue(value) {
+      return value == null || (value is string && value.size() >= 1 && value.size() <= 100);
+    }
+
+    function validAvatar(data) {
+      return data is map
+        && data.keys().hasAll(['body', 'hair', 'outfit', 'weapon', 'accessory', 'pet', 'background'])
+        && data.keys().hasOnly(['body', 'hair', 'outfit', 'weapon', 'accessory', 'pet', 'background'])
+        && validAvatarValue(data.body) && validAvatarValue(data.hair)
+        && validAvatarValue(data.outfit) && validAvatarValue(data.weapon)
+        && validAvatarValue(data.accessory) && validAvatarValue(data.pet)
+        && validAvatarValue(data.background);
+    }
+
+    function validPlayer(data, userId) {
+      return data.keys().hasAll([
+          'uid', 'displayName', 'email', 'photoURL', 'characterName', 'title',
+          'level', 'currentXp', 'totalXp', 'gold', 'streak', 'longestStreak',
+          'completedTasks', 'lastActiveDate', 'avatar', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid', 'displayName', 'email', 'photoURL', 'characterName', 'title',
+          'level', 'currentXp', 'totalXp', 'gold', 'streak', 'longestStreak',
+          'completedTasks', 'lastActiveDate', 'avatar', 'createdAt', 'updatedAt',
+          'lastActionId', 'lastActionType'
+        ])
+        && data.uid == userId
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80
+        && data.email is string && data.email.size() <= 254
+        && (data.photoURL == null || (data.photoURL is string && data.photoURL.size() <= 2048))
+        && data.characterName is string && data.characterName.size() >= 1 && data.characterName.size() <= 80
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 80
+        && data.level is int && data.level >= 1 && data.level <= 10000
+        && data.currentXp is int && data.currentXp >= 0
+        && data.totalXp is int && data.totalXp >= 0 && data.totalXp <= 1000000000
+        && data.gold is int && data.gold >= 0 && data.gold <= 1000000000
+        && data.streak is int && data.streak >= 0 && data.streak <= 1000000
+        && data.longestStreak is int && data.longestStreak >= data.streak && data.longestStreak <= 1000000
+        && data.completedTasks is int && data.completedTasks >= 0 && data.completedTasks <= 1000000000
+        && (data.lastActiveDate == null || data.lastActiveDate is timestamp)
+        && (!('lastActionId' in data) || (data.lastActionId is string && data.lastActionId.size() >= 1 && data.lastActionId.size() <= 160))
+        && (!('lastActionType' in data) || data.lastActionType in ['completion', 'purchase'])
+        && data.createdAt is timestamp && data.updatedAt is timestamp
+        && validAvatar(data.avatar);
+    }
+
+    function validNewPlayer(data, userId) {
+      return validPlayer(data, userId)
+        && !('lastActionId' in data) && !('lastActionType' in data)
+        && data.uid == request.auth.uid && data.title == 'Aventureiro Iniciante'
+        && data.level == 1 && data.currentXp == 0 && data.totalXp == 0
+        && data.gold == 100 && data.streak == 0 && data.longestStreak == 0
+        && data.completedTasks == 0 && data.lastActiveDate == null
+        && data.createdAt == request.time && data.updatedAt == request.time;
+    }
+
+    function validCosmeticPlayerUpdate(userId) {
+      return validPlayer(request.resource.data, userId)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'displayName', 'characterName', 'email', 'photoURL', 'avatar', 'updatedAt'
+        ])
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function xpFloorForLevel(level) {
+      return (level - 1) * 100 + ((level - 1) * (level - 2) * 25);
+    }
+
+    function validLevelProgress(data) {
+      return data.totalXp == xpFloorForLevel(data.level) + data.currentXp
+        && data.currentXp < 100 + ((data.level - 1) * 50);
+    }
+
+    function validCompletionPlayerUpdate(userId) {
+      let actionId = request.resource.data.lastActionId;
+      let completionPath = /databases/$(database)/documents/users/$(userId)/taskCompletions/$(actionId);
+      let completion = getAfter(completionPath).data;
+      return validPlayer(request.resource.data, userId)
+        && request.resource.data.lastActionType == 'completion'
+        && (!('lastActionId' in resource.data) || actionId != resource.data.lastActionId)
+        && existsAfter(completionPath)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'level', 'currentXp', 'totalXp', 'gold', 'streak', 'longestStreak',
+          'completedTasks', 'lastActiveDate', 'lastActionId', 'lastActionType', 'updatedAt'
+        ])
+        && request.resource.data.totalXp == resource.data.totalXp + completion.xpEarned
+        && request.resource.data.completedTasks == resource.data.completedTasks + 1
+        && request.resource.data.level >= resource.data.level
+        && completion.levelBonusGold == (request.resource.data.level - resource.data.level) * 50
+        && request.resource.data.gold == resource.data.gold + completion.goldEarned + completion.levelBonusGold
+        && validLevelProgress(request.resource.data)
+        && request.resource.data.streak in [1, resource.data.streak, resource.data.streak + 1]
+        && request.resource.data.longestStreak in [resource.data.longestStreak, request.resource.data.streak]
+        && request.resource.data.lastActiveDate is timestamp
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validPurchasePlayerUpdate(userId) {
+      let itemId = request.resource.data.lastActionId;
+      let itemPath = /databases/$(database)/documents/storeItems/$(itemId);
+      let inventoryPath = /databases/$(database)/documents/users/$(userId)/inventory/$(itemId);
+      let item = get(itemPath).data;
+      return validPlayer(request.resource.data, userId)
+        && request.resource.data.lastActionType == 'purchase'
+        && (!('lastActionId' in resource.data) || itemId != resource.data.lastActionId)
+        && existsAfter(inventoryPath)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'gold', 'lastActionId', 'lastActionType', 'updatedAt'
+        ])
+        && item.isAvailable == true
+        && resource.data.level >= item.requiredLevel
+        && resource.data.gold >= item.price
+        && request.resource.data.gold == resource.data.gold - item.price
+        && request.resource.data.updatedAt == request.time;
     }
 
     function validDifficultyReward(data) {
@@ -22,31 +146,43 @@ service cloud.firestore {
           'userId', 'title', 'description', 'category', 'difficulty', 'frequency',
           'xpReward', 'goldReward', 'isActive', 'createdAt', 'updatedAt'
         ])
+        && data.keys().hasOnly([
+          'userId', 'title', 'description', 'category', 'difficulty', 'frequency',
+          'weekDays', 'dueDate', 'xpReward', 'goldReward', 'isActive', 'createdAt', 'updatedAt'
+        ])
         && data.userId == userId
         && data.title is string && data.title.size() >= 2 && data.title.size() <= 80
         && data.description is string && data.description.size() <= 240
-        && data.category is string
+        && data.category is string && data.category.size() >= 1 && data.category.size() <= 50
         && data.difficulty in ['common', 'rare', 'epic', 'legendary']
         && data.frequency in ['once', 'daily', 'weekly']
-        && data.isActive is bool
-        && data.xpReward is int && data.goldReward is int
+        && (!('weekDays' in data) || (data.weekDays is list && data.weekDays.size() <= 7))
+        && (!('dueDate' in data) || data.dueDate == null || data.dueDate is timestamp)
+        && data.isActive is bool && data.xpReward is int && data.goldReward is int
+        && data.createdAt is timestamp && data.updatedAt is timestamp
         && validDifficultyReward(data);
     }
 
-    function validCompletion(data) {
+    function validCompletion(data, userId, completionId) {
+      let taskPath = /databases/$(database)/documents/users/$(userId)/tasks/$(data.taskId);
+      let task = get(taskPath).data;
       return data.keys().hasAll([
           'taskId', 'taskTitle', 'difficulty', 'category', 'xpEarned',
           'goldEarned', 'levelBonusGold', 'periodKey', 'completedAt'
         ])
-        && data.taskId is string && data.taskTitle is string
-        && data.category is string && data.periodKey is string
-        && data.difficulty in ['common', 'rare', 'epic', 'legendary']
-        && data.xpEarned is int && data.goldEarned is int && data.levelBonusGold is int
-        && data.levelBonusGold >= 0
-        && ((data.difficulty == 'common' && data.xpEarned == 40 && data.goldEarned == 15)
-          || (data.difficulty == 'rare' && data.xpEarned == 90 && data.goldEarned == 35)
-          || (data.difficulty == 'epic' && data.xpEarned == 150 && data.goldEarned == 60)
-          || (data.difficulty == 'legendary' && data.xpEarned == 250 && data.goldEarned == 100));
+        && data.keys().hasOnly([
+          'taskId', 'taskTitle', 'difficulty', 'category', 'xpEarned',
+          'goldEarned', 'levelBonusGold', 'periodKey', 'completedAt'
+        ])
+        && exists(taskPath) && task.isActive == true
+        && completionId == data.taskId + '_' + data.periodKey
+        && data.taskId is string && data.taskId.size() >= 1 && data.taskId.size() <= 100
+        && data.taskTitle == task.title && data.category == task.category
+        && data.difficulty == task.difficulty
+        && data.periodKey is string && data.periodKey.size() >= 4 && data.periodKey.size() <= 60
+        && data.xpEarned == task.xpReward && data.goldEarned == task.goldReward
+        && data.levelBonusGold is int && data.levelBonusGold >= 0 && data.levelBonusGold <= 500
+        && data.completedAt == request.time;
     }
 
     function validInventoryItem(data, itemId) {
@@ -54,37 +190,68 @@ service cloud.firestore {
           'itemId', 'name', 'category', 'rarity', 'imageUrl',
           'purchasedPrice', 'purchasedAt', 'equipped'
         ])
-        && data.itemId == itemId && data.name is string && data.imageUrl is string
+        && data.keys().hasOnly([
+          'itemId', 'name', 'category', 'rarity', 'imageUrl',
+          'purchasedPrice', 'purchasedAt', 'equipped'
+        ])
+        && data.itemId == itemId
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 100
+        && data.imageUrl is string && data.imageUrl.size() >= 1 && data.imageUrl.size() <= 2048
         && data.category in ['hair', 'outfit', 'weapon', 'accessory', 'pet', 'background']
         && data.rarity in ['common', 'rare', 'epic', 'legendary']
         && data.purchasedPrice is int && data.purchasedPrice >= 0
+        && data.purchasedAt is timestamp && data.equipped is bool;
+    }
+
+    function validInventoryPurchase(data, userId, itemId) {
+      let item = get(/databases/$(database)/documents/storeItems/$(itemId)).data;
+      let player = getAfter(/databases/$(database)/documents/users/$(userId)).data;
+      return validInventoryItem(data, itemId)
+        && player.lastActionType == 'purchase' && player.lastActionId == itemId
+        && data.name == item.name && data.category == item.category
+        && data.rarity == item.rarity && data.imageUrl == item.imageUrl
+        && data.purchasedPrice == item.price && data.purchasedAt == request.time
         && data.equipped == false;
     }
 
     match /users/{userId} {
-      allow create: if ownsUser(userId);
-      allow read, update, delete: if ownsUser(userId);
+      allow create: if ownsUser(userId) && validNewPlayer(request.resource.data, userId);
+      allow read: if ownsUser(userId);
+      allow update: if ownsUser(userId) && (
+        validCosmeticPlayerUpdate(userId)
+        || validCompletionPlayerUpdate(userId)
+        || validPurchasePlayerUpdate(userId)
+      );
+      allow delete: if false;
 
       match /tasks/{taskId} {
         allow read: if ownsUser(userId);
-        allow create: if ownsUser(userId) && validTask(request.resource.data, userId);
-        allow update: if ownsUser(userId)
-          && validTask(request.resource.data, userId)
+        allow create: if ownsUser(userId) && validTask(request.resource.data, userId)
+          && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time;
+        allow update: if ownsUser(userId) && validTask(request.resource.data, userId)
           && request.resource.data.userId == resource.data.userId
-          && request.resource.data.createdAt == resource.data.createdAt;
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.updatedAt == request.time;
         allow delete: if ownsUser(userId);
       }
 
       match /taskCompletions/{completionId} {
         allow read: if ownsUser(userId);
-        allow create: if ownsUser(userId) && validCompletion(request.resource.data);
+        allow create: if ownsUser(userId)
+          && validCompletion(request.resource.data, userId, completionId)
+          && getAfter(/databases/$(database)/documents/users/$(userId)).data.lastActionId == completionId
+          && getAfter(/databases/$(database)/documents/users/$(userId)).data.lastActionType == 'completion';
         allow update, delete: if false;
       }
 
       match /inventory/{itemId} {
         allow read: if ownsUser(userId);
-        allow create: if ownsUser(userId) && validInventoryItem(request.resource.data, itemId);
-        allow update, delete: if false;
+        allow create: if ownsUser(userId) && validInventoryPurchase(request.resource.data, userId, itemId);
+        allow update: if ownsUser(userId)
+          && validInventoryItem(request.resource.data, itemId)
+          && request.resource.data.purchasedAt == resource.data.purchasedAt
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['equipped']);
+        allow delete: if false;
       }
     }
 

@@ -17,12 +17,15 @@ const messages: Record<string, string> = {
   'store/unavailable': 'Este artefato não está disponível agora.',
   'store/level-required': 'Seu nível ainda não é suficiente para este artefato.',
   'store/insufficient-gold': 'Você não possui ouro suficiente para esta compra.',
+  'inventory/item-not-owned': 'Este item não pertence ao seu inventário.',
+  'inventory/item-not-equipped': 'Este item não está equipado.',
 }
 
 export function getFriendlyFirebaseError(error: unknown) {
   if (typeof error === 'object' && error && 'code' in error) {
     const code = String(error.code)
-    return messages[code] ?? 'O reino encontrou um imprevisto. Tente novamente.'
+    const message = 'message' in error ? String(error.message) : ''
+    return messages[message] ?? messages[code] ?? 'O reino encontrou um imprevisto. Tente novamente.'
   }
   if (error instanceof Error) return messages[error.message] ?? 'O reino encontrou um imprevisto. Tente novamente.'
   return 'O reino encontrou um imprevisto. Tente novamente.'

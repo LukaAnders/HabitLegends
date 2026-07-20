@@ -9,6 +9,7 @@
     "firebase:check": "node scripts/check-firebase-connection.mjs",
     "seed:store": "node scripts/seed-store.mjs",
     "lint": "eslint .",
+    "test": "vitest run",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -34,6 +35,7 @@
     "postcss": "latest",
     "tailwindcss": "^3.4.17",
     "typescript": "latest",
-    "typescript-eslint": "latest"
+    "typescript-eslint": "latest",
+    "vitest": "^4.1.10"
   }
 }
