@@ -8,6 +8,8 @@
     "build": "tsc -b && vite build",
     "firebase:check": "node scripts/check-firebase-connection.mjs",
     "seed:store": "node scripts/seed-store.mjs",
+    "seed:journey": "node scripts/seed-journey.mjs",
+    "seed:achievements": "node scripts/seed-achievements.mjs",
     "lint": "eslint .",
     "test": "vitest run",
     "preview": "vite preview"

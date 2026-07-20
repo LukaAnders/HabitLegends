@@ -2,10 +2,10 @@ import { doc, runTransaction, serverTimestamp } from 'firebase/firestore'
 import { db, requireFirebase } from '../lib/firebase'
 import type { PlayerProfile } from '../types/firebase'
 import type { InventoryItem, ItemCategory } from '../types/store'
+import { createActivityLogEntry } from './activityLogService'
 
 const defaultAvatarValue: Record<ItemCategory, string | null> = {
-  hair: 'hair_default', outfit: 'outfit_default', background: 'background_default',
-  weapon: null, accessory: null, pet: null,
+  hair: null, outfit: null, background: null, weapon: null, accessory: null, pet: null,
 }
 
 export async function equipItem(userId: string, itemId: string) {
@@ -29,6 +29,7 @@ export async function equipItem(userId: string, itemId: string) {
     transaction.update(profileRef, { [`avatar.${item.category}`]: itemId, updatedAt: serverTimestamp() })
     transaction.update(itemRef, { equipped: true })
     if (previousRef) transaction.update(previousRef, { equipped: false })
+    createActivityLogEntry(transaction, firestore, userId, { id: `item_equipped_${itemId}_${crypto.randomUUID()}`, type: 'item_equipped', title: 'Equipamento alterado', description: `${item.name} equipado.`, metadata: { itemId, itemName: item.name, category: item.category }, createdAt: serverTimestamp() })
   })
 }
 

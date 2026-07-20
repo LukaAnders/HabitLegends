@@ -53,7 +53,7 @@ service cloud.firestore {
         && data.completedTasks is int && data.completedTasks >= 0 && data.completedTasks <= 1000000000
         && (data.lastActiveDate == null || data.lastActiveDate is timestamp)
         && (!('lastActionId' in data) || (data.lastActionId is string && data.lastActionId.size() >= 1 && data.lastActionId.size() <= 160))
-        && (!('lastActionType' in data) || data.lastActionType in ['completion', 'purchase'])
+        && (!('lastActionType' in data) || data.lastActionType in ['completion', 'purchase', 'journey', 'achievement', 'daily_reward'])
         && data.createdAt is timestamp && data.updatedAt is timestamp
         && validAvatar(data.avatar);
     }
@@ -91,8 +91,7 @@ service cloud.firestore {
       let actionId = request.resource.data.lastActionId;
       let completionPath = /databases/$(database)/documents/users/$(userId)/taskCompletions/$(actionId);
       let completion = getAfter(completionPath).data;
-      return validPlayer(request.resource.data, userId)
-        && request.resource.data.lastActionType == 'completion'
+      return request.resource.data.lastActionType == 'completion'
         && (!('lastActionId' in resource.data) || actionId != resource.data.lastActionId)
         && existsAfter(completionPath)
         && request.resource.data.uid == resource.data.uid
@@ -103,6 +102,13 @@ service cloud.firestore {
         ])
         && request.resource.data.totalXp == resource.data.totalXp + completion.xpEarned
         && request.resource.data.completedTasks == resource.data.completedTasks + 1
+        && request.resource.data.level is int
+        && request.resource.data.currentXp is int && request.resource.data.currentXp >= 0
+        && request.resource.data.totalXp is int && request.resource.data.totalXp >= 0
+        && request.resource.data.gold is int && request.resource.data.gold >= 0
+        && request.resource.data.streak is int && request.resource.data.streak >= 0
+        && request.resource.data.longestStreak is int
+        && request.resource.data.completedTasks is int
         && request.resource.data.level >= resource.data.level
         && completion.levelBonusGold == (request.resource.data.level - resource.data.level) * 50
         && request.resource.data.gold == resource.data.gold + completion.goldEarned + completion.levelBonusGold
@@ -118,8 +124,7 @@ service cloud.firestore {
       let itemPath = /databases/$(database)/documents/storeItems/$(itemId);
       let inventoryPath = /databases/$(database)/documents/users/$(userId)/inventory/$(itemId);
       let item = get(itemPath).data;
-      return validPlayer(request.resource.data, userId)
-        && request.resource.data.lastActionType == 'purchase'
+      return request.resource.data.lastActionType == 'purchase'
         && (!('lastActionId' in resource.data) || itemId != resource.data.lastActionId)
         && existsAfter(inventoryPath)
         && request.resource.data.uid == resource.data.uid
@@ -127,11 +132,190 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'gold', 'lastActionId', 'lastActionType', 'updatedAt'
         ])
+        && request.resource.data.gold is int && request.resource.data.gold >= 0
         && item.isAvailable == true
         && resource.data.level >= item.requiredLevel
         && resource.data.gold >= item.price
         && request.resource.data.gold == resource.data.gold - item.price
         && request.resource.data.updatedAt == request.time;
+    }
+
+    function validJourneyPlayerUpdate(userId) {
+      let regionId = request.resource.data.lastActionId;
+      let region = get(/databases/$(database)/documents/journeyRegions/$(regionId)).data;
+      let progressPath = /databases/$(database)/documents/users/$(userId)/journey/$(regionId);
+      return request.resource.data.lastActionType == 'journey'
+        && (!('lastActionId' in resource.data) || regionId != resource.data.lastActionId)
+        && existsAfter(progressPath)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'level', 'currentXp', 'totalXp', 'gold', 'title',
+          'lastActionId', 'lastActionType', 'updatedAt'
+        ])
+        && request.resource.data.level is int
+        && request.resource.data.currentXp is int && request.resource.data.currentXp >= 0
+        && request.resource.data.totalXp is int && request.resource.data.totalXp >= 0
+        && request.resource.data.gold is int && request.resource.data.gold >= 0
+        && request.resource.data.title is string
+        && resource.data.level >= region.minimumLevel
+        && request.resource.data.totalXp == resource.data.totalXp + region.reward.xp
+        && request.resource.data.gold == resource.data.gold + region.reward.gold
+        && request.resource.data.level >= resource.data.level
+        && validLevelProgress(request.resource.data)
+        && ((region.reward.title == null && request.resource.data.title == resource.data.title)
+          || (region.reward.title is string && request.resource.data.title == region.reward.title))
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validAchievementPlayerUpdate(userId) {
+      let achievementId = request.resource.data.lastActionId;
+      let achievement = get(/databases/$(database)/documents/achievements/$(achievementId)).data;
+      let progressPath = /databases/$(database)/documents/users/$(userId)/achievements/$(achievementId);
+      return request.resource.data.lastActionType == 'achievement'
+        && existsAfter(progressPath) && getAfter(progressPath).data.rewardClaimed == true
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'level', 'currentXp', 'totalXp', 'gold', 'title', 'lastActionId', 'lastActionType', 'updatedAt'
+        ])
+        && request.resource.data.totalXp == resource.data.totalXp + achievement.reward.xp
+        && request.resource.data.gold == resource.data.gold + achievement.reward.gold
+        && request.resource.data.level >= resource.data.level
+        && validLevelProgress(request.resource.data)
+        && ((achievement.reward.titleId == null && request.resource.data.title == resource.data.title)
+          || (achievement.reward.titleId is string && request.resource.data.title == achievement.reward.titleId))
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validDailyRewardPlayerUpdate(userId) {
+      let dateKey = request.resource.data.lastActionId;
+      let rewardPath = /databases/$(database)/documents/users/$(userId)/dailyRewards/$(dateKey);
+      return request.resource.data.lastActionType == 'daily_reward'
+        && existsAfter(rewardPath) && getAfter(rewardPath).data.xp == 200 && getAfter(rewardPath).data.gold == 100
+        && request.resource.data.uid == resource.data.uid && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['level','currentXp','totalXp','gold','lastActionId','lastActionType','updatedAt'])
+        && request.resource.data.totalXp == resource.data.totalXp + 200 && request.resource.data.gold == resource.data.gold + 100
+        && request.resource.data.level >= resource.data.level && validLevelProgress(request.resource.data)
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validDailyReward(data, userId, dateKey) {
+      let player = getAfter(/databases/$(database)/documents/users/$(userId)).data;
+      return dateKey.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+        && data.keys().hasAll(['dateKey','completedTasks','targetTasks','xp','gold','claimedAt'])
+        && data.keys().hasOnly(['dateKey','completedTasks','targetTasks','xp','gold','claimedAt'])
+        && data.dateKey == dateKey && data.completedTasks is int && data.targetTasks is int
+        && data.targetTasks > 0 && data.completedTasks >= data.targetTasks
+        && data.xp == 200 && data.gold == 100 && data.claimedAt == request.time
+        && player.lastActionType == 'daily_reward' && player.lastActionId == dateKey;
+    }
+
+    function validAchievementUnlock(data, achievementId) {
+      let definition = get(/databases/$(database)/documents/achievements/$(achievementId)).data;
+      return data.keys().hasAll(['achievementId','currentProgress','target','unlocked','unlockedAt','rewardClaimed','rewardClaimedAt','updatedAt'])
+        && data.keys().hasOnly(['achievementId','currentProgress','target','unlocked','unlockedAt','rewardClaimed','rewardClaimedAt','updatedAt'])
+        && data.achievementId == achievementId && data.currentProgress is int
+        && data.currentProgress >= definition.requirement.target && data.target == definition.requirement.target
+        && data.unlocked == true && data.unlockedAt == request.time
+        && data.rewardClaimed == false && data.rewardClaimedAt == null && data.updatedAt == request.time;
+    }
+
+    function validAchievementClaim(data, userId, achievementId) {
+      let player = getAfter(/databases/$(database)/documents/users/$(userId)).data;
+      return data.achievementId == resource.data.achievementId && data.target == resource.data.target
+        && data.currentProgress == resource.data.currentProgress && data.unlocked == resource.data.unlocked
+        && data.unlockedAt == resource.data.unlockedAt
+        && resource.data.unlocked == true && resource.data.rewardClaimed == false
+        && data.rewardClaimed == true && data.rewardClaimedAt == request.time && data.updatedAt == request.time
+        && data.diff(resource.data).affectedKeys().hasOnly(['rewardClaimed','rewardClaimedAt','updatedAt'])
+        && player.lastActionType == 'achievement' && player.lastActionId == achievementId;
+    }
+
+    function validAchievementActivity(data, userId, activityId) {
+      let achievementId = data.metadata.achievementId;
+      let definition = get(/databases/$(database)/documents/achievements/$(achievementId)).data;
+      let progress = getAfter(/databases/$(database)/documents/users/$(userId)/achievements/$(achievementId)).data;
+      return data.keys().hasAll(['type','title','description','metadata','createdAt'])
+        && data.keys().hasOnly(['type','title','description','metadata','createdAt'])
+        && data.type in ['achievement_unlocked','achievement_reward_claimed']
+        && data.title is string && data.title.size() <= 140 && data.description is string && data.description.size() <= 300
+        && data.metadata.keys().hasOnly(['achievementId','achievementName','rarity','xp','gold'])
+        && data.metadata.achievementName == definition.name && data.metadata.rarity == definition.rarity
+        && data.metadata.xp == definition.reward.xp && data.metadata.gold == definition.reward.gold
+        && data.createdAt == request.time
+        && ((data.type == 'achievement_unlocked' && activityId == 'achievement_unlocked_' + achievementId && progress.unlocked == true)
+          || (data.type == 'achievement_reward_claimed' && activityId == 'achievement_reward_' + achievementId && progress.rewardClaimed == true));
+    }
+
+    function validActivityBase(data) {
+      return data.keys().hasAll(['type','title','description','metadata','createdAt'])
+        && data.keys().hasOnly(['type','title','description','metadata','createdAt'])
+        && data.type is string && data.title is string && data.title.size() >= 1 && data.title.size() <= 140
+        && data.description is string && data.description.size() >= 1 && data.description.size() <= 300
+        && data.metadata is map && data.metadata.size() <= 10 && data.createdAt == request.time;
+    }
+
+    function validCompletionActivity(data, userId, activityId) {
+      let completionId = data.metadata.completionId;
+      let completion = getAfter(/databases/$(database)/documents/users/$(userId)/taskCompletions/$(completionId)).data;
+      let player = getAfter(/databases/$(database)/documents/users/$(userId)).data;
+      return validActivityBase(data) && completionId is string
+        && ((data.type == 'task_completed' && activityId == 'task_completed_' + completionId
+          && data.metadata.taskId == completion.taskId && data.metadata.taskName == completion.taskTitle
+          && data.metadata.xp == completion.xpEarned && data.metadata.gold == completion.goldEarned
+          && data.metadata.difficulty == completion.difficulty && data.metadata.category == completion.category)
+        || (data.type == 'level_up' && activityId == 'level_up_' + completionId && data.metadata.level == player.level)
+        || (data.type == 'streak_milestone' && activityId == 'streak_milestone_' + completionId && data.metadata.streak == player.longestStreak));
+    }
+
+    function validMarketActivity(data, userId, activityId) {
+      let itemId = data.metadata.itemId;
+      let item = get(/databases/$(database)/documents/storeItems/$(itemId)).data;
+      let inventory = getAfter(/databases/$(database)/documents/users/$(userId)/inventory/$(itemId)).data;
+      return validActivityBase(data) && itemId is string
+        && data.metadata.itemName == item.name && data.metadata.category == item.category
+        && ((data.type == 'item_purchased' && activityId == 'item_purchased_' + itemId
+          && data.metadata.rarity == item.rarity && data.metadata.gold == item.price && inventory.purchasedPrice == item.price)
+        || (data.type == 'item_equipped' && activityId.matches('item_equipped_' + itemId + '_.*') && inventory.equipped == true));
+    }
+
+    function validJourneyProgress(data, userId, regionId) {
+      let region = get(/databases/$(database)/documents/journeyRegions/$(regionId)).data;
+      let player = getAfter(/databases/$(database)/documents/users/$(userId)).data;
+      return data.keys().hasAll([
+          'regionId', 'status', 'rewardClaimed', 'objectivesSnapshot',
+          'completedAt', 'claimedAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'regionId', 'status', 'rewardClaimed', 'objectivesSnapshot',
+          'completedAt', 'claimedAt', 'updatedAt'
+        ])
+        && data.regionId == regionId && data.status == 'completed' && data.rewardClaimed == true
+        && data.objectivesSnapshot is map && data.objectivesSnapshot.size() <= 10
+        && data.completedAt == request.time && data.claimedAt == request.time && data.updatedAt == request.time
+        && player.lastActionType == 'journey' && player.lastActionId == regionId
+        && player.level >= region.minimumLevel
+        && (region.previousRegionId == null
+          || (exists(/databases/$(database)/documents/users/$(userId)/journey/$(region.previousRegionId))
+            && get(/databases/$(database)/documents/users/$(userId)/journey/$(region.previousRegionId)).data.rewardClaimed == true));
+    }
+
+    function validJourneyActivity(data, userId, activityId) {
+      let regionId = data.metadata.regionId;
+      let progressPath = /databases/$(database)/documents/users/$(userId)/journey/$(regionId);
+      let region = get(/databases/$(database)/documents/journeyRegions/$(regionId)).data;
+      return data.keys().hasAll(['type', 'title', 'description', 'metadata', 'createdAt'])
+        && data.keys().hasOnly(['type', 'title', 'description', 'metadata', 'createdAt'])
+        && data.type in ['journey_region_completed', 'journey_completed']
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 140
+        && data.description is string && data.description.size() >= 1 && data.description.size() <= 300
+        && data.metadata is map && data.metadata.keys().hasOnly(['regionId', 'xp', 'gold', 'title'])
+        && regionId is string && activityId == 'journey_' + regionId
+        && data.metadata.xp == region.reward.xp && data.metadata.gold == region.reward.gold
+        && data.metadata.title == region.reward.title
+        && data.createdAt == request.time
+        && existsAfter(progressPath) && getAfter(progressPath).data.rewardClaimed == true;
     }
 
     function validDifficultyReward(data) {
@@ -192,7 +376,7 @@ service cloud.firestore {
         ])
         && data.keys().hasOnly([
           'itemId', 'name', 'category', 'rarity', 'imageUrl',
-          'purchasedPrice', 'purchasedAt', 'equipped'
+          'purchasedPrice', 'purchasedAt', 'equipped', 'avatarSlot', 'avatarTransform'
         ])
         && data.itemId == itemId
         && data.name is string && data.name.size() >= 1 && data.name.size() <= 100
@@ -200,7 +384,14 @@ service cloud.firestore {
         && data.category in ['hair', 'outfit', 'weapon', 'accessory', 'pet', 'background']
         && data.rarity in ['common', 'rare', 'epic', 'legendary']
         && data.purchasedPrice is int && data.purchasedPrice >= 0
-        && data.purchasedAt is timestamp && data.equipped is bool;
+        && data.purchasedAt is timestamp && data.equipped is bool
+        && (!('avatarSlot' in data) || data.avatarSlot in ['background','body','outfit','hair','faceAccessory','chestAccessory','backAccessory','leftHandWeapon','rightHandWeapon','pet','foreground'])
+        && (!('avatarTransform' in data) || (data.avatarTransform is map
+          && data.avatarTransform.keys().hasAll(['x','y','scale','rotation'])
+          && data.avatarTransform.keys().hasOnly(['x','y','scale','rotation','flipX'])
+          && data.avatarTransform.x is number && data.avatarTransform.y is number
+          && data.avatarTransform.scale is number && data.avatarTransform.rotation is number
+          && (!('flipX' in data.avatarTransform) || data.avatarTransform.flipX is bool)));
     }
 
     function validInventoryPurchase(data, userId, itemId) {
@@ -210,6 +401,8 @@ service cloud.firestore {
         && player.lastActionType == 'purchase' && player.lastActionId == itemId
         && data.name == item.name && data.category == item.category
         && data.rarity == item.rarity && data.imageUrl == item.imageUrl
+        && data.avatarSlot == item.avatarSlot
+        && ((!('avatarTransform' in item) && !('avatarTransform' in data)) || data.avatarTransform == item.avatarTransform)
         && data.purchasedPrice == item.price && data.purchasedAt == request.time
         && data.equipped == false;
     }
@@ -219,9 +412,16 @@ service cloud.firestore {
       allow read: if ownsUser(userId);
       allow update: if ownsUser(userId) && (
         validCosmeticPlayerUpdate(userId)
-        || validCompletionPlayerUpdate(userId)
-        || validPurchasePlayerUpdate(userId)
-      );
+          || (request.resource.data.lastActionType == 'completion'
+            && validCompletionPlayerUpdate(userId))
+          || (request.resource.data.lastActionType == 'purchase'
+            && validPurchasePlayerUpdate(userId))
+          || (request.resource.data.lastActionType == 'journey'
+            && validJourneyPlayerUpdate(userId))
+          || (request.resource.data.lastActionType == 'achievement'
+            && validAchievementPlayerUpdate(userId))
+          || (request.resource.data.lastActionType == 'daily_reward'
+            && validDailyRewardPlayerUpdate(userId)));
       allow delete: if false;
 
       match /tasks/{taskId} {
@@ -253,6 +453,36 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['equipped']);
         allow delete: if false;
       }
+
+      match /journey/{regionId} {
+        allow read: if ownsUser(userId);
+        allow create: if ownsUser(userId)
+          && validJourneyProgress(request.resource.data, userId, regionId);
+        allow update, delete: if false;
+      }
+
+      match /activityLog/{activityId} {
+        allow read: if ownsUser(userId);
+        allow create: if ownsUser(userId) && (
+          (request.resource.data.type in ['journey_region_completed','journey_completed'] && validJourneyActivity(request.resource.data, userId, activityId))
+          || (request.resource.data.type in ['achievement_unlocked','achievement_reward_claimed'] && validAchievementActivity(request.resource.data, userId, activityId))
+          || (request.resource.data.type in ['task_completed','level_up','streak_milestone'] && validCompletionActivity(request.resource.data, userId, activityId))
+          || (request.resource.data.type in ['item_purchased','item_equipped'] && validMarketActivity(request.resource.data, userId, activityId)));
+        allow update, delete: if false;
+      }
+
+      match /achievements/{achievementId} {
+        allow read: if ownsUser(userId);
+        allow create: if ownsUser(userId) && validAchievementUnlock(request.resource.data, achievementId);
+        allow update: if ownsUser(userId) && validAchievementClaim(request.resource.data, userId, achievementId);
+        allow delete: if false;
+      }
+
+      match /dailyRewards/{dateKey} {
+        allow read: if ownsUser(userId);
+        allow create: if ownsUser(userId) && validDailyReward(request.resource.data, userId, dateKey);
+        allow update, delete: if false;
+      }
     }
 
     match /questTemplates/{questId} {
@@ -261,6 +491,16 @@ service cloud.firestore {
     }
 
     match /storeItems/{itemId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /journeyRegions/{regionId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /achievements/{achievementId} {
       allow read: if signedIn();
       allow write: if false;
     }

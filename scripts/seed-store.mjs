@@ -29,5 +29,6 @@ const items = [
   ['background_castle','Castelo das Lendas','O horizonte reservado aos maiores heróis.','background','epic',900,15,'background',10],
 ]
 const db = getFirestore(); const batch = db.batch()
-for (const [id,name,description,category,rarity,price,requiredLevel,image,layerOrder] of items) batch.set(db.collection('storeItems').doc(id), { name, description, category, rarity, price, requiredLevel, imageUrl: `/assets/items/${image}.svg`, layerOrder, isAvailable: true, createdAt: FieldValue.serverTimestamp() }, { merge: true })
+const slotFor=(id,category)=>id==='accessory_leaf'?'chestAccessory':category==='accessory'?'faceAccessory':category==='weapon'?'rightHandWeapon':category
+for (const [id,name,description,category,rarity,price,requiredLevel,image,layerOrder] of items) batch.set(db.collection('storeItems').doc(id), { name, description, category, rarity, price, requiredLevel, imageUrl: `/assets/items/${image}.svg`, layerOrder, avatarSlot:slotFor(id,category), isAvailable: true, createdAt: FieldValue.serverTimestamp() }, { merge: true })
 await batch.commit(); console.log(`${items.length} artefatos adicionados ao mercado.`)

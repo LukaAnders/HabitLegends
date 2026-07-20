@@ -1,18 +1,3 @@
-import type { PlayerAvatar } from '../../types/firebase'
-import type { InventoryItem, ItemCategory } from '../../types/store'
-
-const defaults: Record<string, string> = {
-  background_default: '/assets/items/background.svg', body_default: '/assets/items/body.svg',
-  outfit_default: '/assets/items/outfit.svg', hair_default: '/assets/items/hair.svg',
-}
-const order: Array<'background' | 'body' | ItemCategory> = ['background', 'body', 'outfit', 'hair', 'accessory', 'weapon', 'pet']
-
-export function AvatarRenderer({ avatar, inventory, includeBackground = true, className = '' }: { avatar: PlayerAvatar; inventory: InventoryItem[]; includeBackground?: boolean; className?: string }) {
-  const inventoryMap = new Map(inventory.map(item => [item.itemId, item.imageUrl]))
-  const sources = order.map(category => {
-    if (category === 'body') return { category, src: defaults[avatar.body] ?? defaults.body_default }
-    const itemId = avatar[category]
-    return { category, src: itemId ? inventoryMap.get(itemId) ?? defaults[itemId] : undefined }
-  }).filter(layer => layer.src && (includeBackground || layer.category !== 'background'))
-  return <div className={`avatar-renderer ${className}`} aria-label="Avatar equipado">{sources.map(layer => <img key={layer.category} src={layer.src} alt="" data-layer={layer.category} />)}</div>
-}
+import{AvatarLayer,type AvatarLayerItem}from'./AvatarLayer';import{AVATAR_LAYER_ORDER,getLegacyAvatarSlot}from'../../constants/avatar';import type{PlayerAvatar}from'../../types/firebase';import type{InventoryItem}from'../../types/store'
+const defaults:Record<string,string>={background_default:'/assets/items/background.svg',body_default:'/assets/items/body.svg',outfit_default:'/assets/items/outfit.svg',hair_default:'/assets/items/hair.svg'}
+export function AvatarRenderer({avatar,inventory,includeBackground=true,className='',debug=false}:{avatar:PlayerAvatar;inventory:InventoryItem[];includeBackground?:boolean;className?:string;debug?:boolean}){const equipped=new Set(Object.values(avatar).filter(Boolean)),layers:AvatarLayerItem[]=[{name:'Corpo',imageUrl:defaults[avatar.body]??defaults.body_default,avatarSlot:'body'}];for(const item of inventory)if(equipped.has(item.itemId))layers.push({name:item.name,imageUrl:item.imageUrl,avatarSlot:item.avatarSlot??getLegacyAvatarSlot(item),avatarTransform:item.avatarTransform});for(const slot of ['background','outfit','hair']as const){const id=avatar[slot];if(id&&defaults[id]&&!inventory.some(item=>item.itemId===id))layers.push({imageUrl:defaults[id],avatarSlot:slot})}const visible=layers.filter(item=>includeBackground||item.avatarSlot!=='background').sort((a,b)=>AVATAR_LAYER_ORDER.indexOf(a.avatarSlot)-AVATAR_LAYER_ORDER.indexOf(b.avatarSlot));return <div className={`avatar-renderer avatar-composer ${debug?'avatar-debug':''} ${className}`} aria-label="Avatar equipado">{debug&&<><i className="avatar-grid"/><b className="avatar-center"/></>}{visible.map((item,index)=><AvatarLayer key={`${item.avatarSlot}-${index}`} item={item} debug={debug}/>)}</div>}

@@ -6,6 +6,7 @@ import type { PlayerProfile } from '../types/firebase'
 import type { HabitTask } from '../types/tasks'
 import { applyXpGain, getXpRequiredForLevel } from '../utils/level'
 import { getCompletionId, getPeriodKey, getStreakUpdate } from '../utils/taskPeriods'
+import { createActivityLogEntry } from './activityLogService'
 
 export async function completeTask(userId: string, taskId: string): Promise<CompletionReward> {
   if (requireFirebase(auth, 'Firebase Authentication').currentUser?.uid !== userId) {
@@ -61,6 +62,9 @@ export async function completeTask(userId: string, taskId: string): Promise<Comp
       periodKey: getPeriodKey(task.frequency, task.id, now),
       completedAt: serverTimestamp(),
     })
+    createActivityLogEntry(transaction, firestore, userId, { id: `task_completed_${completionId}`, type: 'task_completed', title: 'Missão concluída', description: `Você concluiu “${task.title}”.`, metadata: { completionId, taskId: task.id, taskName: task.title, xp: reward.xp, gold: reward.gold, difficulty: task.difficulty, category: task.category }, createdAt: serverTimestamp() })
+    if (levelResult.levelsGained > 0) createActivityLogEntry(transaction, firestore, userId, { id: `level_up_${completionId}`, type: 'level_up', title: 'Novo nível', description: `Você alcançou o nível ${levelResult.level}.`, metadata: { completionId, level: levelResult.level }, createdAt: serverTimestamp() })
+    if (streakResult.longestStreak > profile.longestStreak) createActivityLogEntry(transaction, firestore, userId, { id: `streak_milestone_${completionId}`, type: 'streak_milestone', title: 'Novo recorde de sequência', description: `Sua chama permanece acesa há ${streakResult.longestStreak} dias.`, metadata: { completionId, streak: streakResult.longestStreak }, createdAt: serverTimestamp() })
     transaction.update(taskRef, {
       isActive: task.frequency === 'once' ? false : task.isActive,
       updatedAt: serverTimestamp(),

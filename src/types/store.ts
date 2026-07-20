@@ -2,6 +2,8 @@ import type { Timestamp } from 'firebase/firestore'
 
 export type ItemCategory = 'hair' | 'outfit' | 'weapon' | 'accessory' | 'pet' | 'background'
 export type ItemRarity = 'common' | 'rare' | 'epic' | 'legendary'
+export type AvatarSlot = 'background'|'body'|'outfit'|'hair'|'faceAccessory'|'chestAccessory'|'backAccessory'|'leftHandWeapon'|'rightHandWeapon'|'pet'|'foreground'
+export type AvatarTransform = { x:number; y:number; scale:number; rotation:number; flipX?:boolean }
 
 export interface StoreItem {
   id: string
@@ -13,6 +15,8 @@ export interface StoreItem {
   requiredLevel: number
   imageUrl: string
   layerOrder: number
+  avatarSlot: AvatarSlot
+  avatarTransform?: AvatarTransform
   isAvailable: boolean
   createdAt: Timestamp
 }
@@ -27,6 +31,8 @@ export interface InventoryItem {
   purchasedPrice: number
   purchasedAt: Timestamp
   equipped: boolean
+  avatarSlot?: AvatarSlot
+  avatarTransform?: AvatarTransform
 }
 
 export interface PurchaseResult {

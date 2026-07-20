@@ -2,12 +2,12 @@ import type { Timestamp } from 'firebase/firestore'
 
 export interface PlayerAvatar {
   body: string
-  hair: string
-  outfit: string
+  hair: string | null
+  outfit: string | null
   weapon: string | null
   accessory: string | null
   pet: string | null
-  background: string
+  background: string | null
 }
 
 export interface PlayerProfile {
@@ -26,7 +26,7 @@ export interface PlayerProfile {
   completedTasks: number
   lastActiveDate: Timestamp | null
   lastActionId?: string
-  lastActionType?: 'completion' | 'purchase'
+  lastActionType?: 'completion' | 'purchase' | 'journey' | 'achievement' | 'daily_reward'
   avatar: PlayerAvatar
   createdAt?: Timestamp
   updatedAt?: Timestamp

@@ -19,6 +19,10 @@ const messages: Record<string, string> = {
   'store/insufficient-gold': 'Você não possui ouro suficiente para esta compra.',
   'inventory/item-not-owned': 'Este item não pertence ao seu inventário.',
   'inventory/item-not-equipped': 'Este item não está equipado.',
+  'journey/region-not-found': 'Esta região ainda não foi revelada.',
+  'journey/reward-already-claimed': 'A recompensa desta região já foi resgatada.',
+  'journey/region-locked': 'Seu nível ainda não permite entrar nesta região.',
+  'journey/previous-region-required': 'Conclua a região anterior antes de avançar.',
 }
 
 export function getFriendlyFirebaseError(error: unknown) {

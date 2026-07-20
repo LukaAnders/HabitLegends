@@ -1,0 +1,1 @@
+import type{Timestamp}from'firebase/firestore';export interface DailyReward{dateKey:string;completedTasks:number;targetTasks:number;xp:number;gold:number;claimedAt:Timestamp}export interface DailyRewardResult{xp:number;gold:number;newLevel:number;levelsGained:number}

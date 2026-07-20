@@ -1,18 +1,30 @@
-import { motion } from 'framer-motion'
-import { Backpack, Paintbrush } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Backpack, Map, Paintbrush } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import type { CSSProperties } from 'react'
 import { LevelBadge, XpBar } from './GamePrimitives'
 import { usePlayer } from '../contexts/player-context'
 import { useInventory } from '../hooks/useInventory'
 import { AvatarRenderer } from './avatar/AvatarRenderer'
+import { useJourney } from '../hooks/useJourney'
+
+const regionThemes = {
+  emerald: { glow: '#f5b942', aura: '#a855f7' }, forest: { glow: '#73d5a2', aura: '#22c55e' },
+  frost: { glow: '#b9e6ff', aura: '#3b82f6' }, arcane: { glow: '#d8a7ff', aura: '#a855f7' },
+  gold: { glow: '#f5b942', aura: '#f59e0b' },
+} as const
 
 const particles = Array.from({ length: 14 }, (_, i) => ({ left: `${8 + (i * 37) % 84}%`, top: `${12 + (i * 29) % 70}%`, delay: i * .28, size: i % 3 + 2 }))
 
 export function HeroStage({ bonusXp = 0 }: { bonusXp?: number }) {
   const { player } = usePlayer()
   const { items: inventory } = useInventory()
+  const { regions } = useJourney()
+  const activeRegion = regions.find(region => region.state !== 'completed') ?? regions.at(-1)
+  const theme = regionThemes[activeRegion?.accent ?? 'emerald']
   const xpRequired = 100 + ((player?.level ?? 1) - 1) * 50
-  return <motion.section initial={{ opacity: 0, scale: .985 }} animate={{ opacity: 1, scale: 1 }} className="hero-stage">
+  return <motion.section initial={{ opacity: 0, scale: .985 }} animate={{ opacity: 1, scale: 1 }} className="hero-stage" style={{ '--region-glow': theme.glow, '--region-aura': theme.aura } as CSSProperties}>
+    <AnimatePresence mode="popLayout">{activeRegion && <motion.div key={activeRegion.id} className="region-backdrop" initial={{ opacity: 0, scale: 1.04 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: .8, ease: 'easeOut' }} style={{ backgroundImage: `url(${activeRegion.imageUrl})` }} />}</AnimatePresence>
     <div className="sky-glow" /><div className="moon" /><div className="mountains mountain-back" /><div className="mountains mountain-front" />
     <div className="castle-silhouette"><i /><i /><i /></div><div className="ground-haze" />
     {particles.map((p, i) => <motion.span key={i} className="absolute z-[2] rounded-full bg-amber-200" style={{ left: p.left, top: p.top, width: p.size, height: p.size }} animate={{ y: [0, -13, 0], opacity: [.15, .8, .15] }} transition={{ duration: 3.6 + i % 4, delay: p.delay, repeat: Infinity }} />)}
@@ -21,6 +33,7 @@ export function HeroStage({ bonusXp = 0 }: { bonusXp?: number }) {
         <p className="mb-2 text-[10px] font-bold uppercase tracking-[.35em] text-gold">Personagem atual</p>
         <h1 className="font-display text-3xl font-bold text-parchment sm:text-4xl">{player?.characterName ?? 'Aventureiro'}</h1>
         <p className="mt-1 font-display text-sm text-amber-200/80">{player?.title ?? 'Aventureiro Iniciante'}</p>
+        {activeRegion && <Link to="/jornada" className="region-marker"><Map size={13} /><span>Região atual</span><strong>{activeRegion.name}</strong></Link>}
         <div className="mx-auto mt-5 max-w-sm lg:mx-0"><XpBar value={(player?.currentXp ?? 0) + bonusXp} max={xpRequired} /></div>
         <div className="mt-5 flex justify-center gap-2 lg:justify-start"><Link to="/inventario" className="game-action"><Backpack size={17} /> Inventário</Link><Link to="/heroi" className="game-action"><Paintbrush size={17} /> Aparência</Link></div>
       </div>

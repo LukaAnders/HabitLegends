@@ -1,0 +1,11 @@
+import { motion } from 'framer-motion'
+import { createElement, type CSSProperties } from 'react'
+import { Coins, Sparkles } from 'lucide-react'
+import type { ActivityLogEntry } from '../../types/activity'
+import { formatActivityDate, getActivityColor, getActivityIcon, groupActivitiesByDay } from '../../utils/journalUtils'
+function metaNumber(entry:ActivityLogEntry,key:string){const value=entry.metadata?.[key];return typeof value==='number'?value:null}
+export function JournalEntryCard({entry}:{entry:ActivityLogEntry}){const color=getActivityColor(entry.type),xp=metaNumber(entry,'xp'),gold=metaNumber(entry,'gold');return <motion.article initial={{opacity:0,x:-12}} whileInView={{opacity:1,x:0}} viewport={{once:true}} whileHover={{x:4}} className="journal-entry" style={{'--entry-color':color} as CSSProperties}><div className="journal-entry-icon">{createElement(getActivityIcon(entry.type))}</div><div><time>{entry.createdAt?.toDate?.().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</time><h3>{entry.title}</h3><p>{entry.description}</p>{(xp!==null||gold!==null)&&<footer>{xp!==null&&<span><Sparkles/>+{xp} XP</span>}{gold!==null&&<span><Coins/>+{gold} ouro</span>}</footer>}</div></motion.article>}
+export function JournalDayGroup({date,entries}:{date:string;entries:ActivityLogEntry[]}){return <section className="journal-day"><header><span>{date==='unknown'?'DATA DESCONHECIDA':formatActivityDate(new Date(`${date}T12:00:00`))}</span><i/></header><div>{entries.map(entry=><JournalEntryCard key={entry.id} entry={entry}/>)}</div></section>}
+export function JournalTimeline({entries}:{entries:ActivityLogEntry[]}){const groups=groupActivitiesByDay(entries);return <div className="journal-timeline">{Object.entries(groups).map(([date,value])=><JournalDayGroup key={date} date={date} entries={value}/>)}</div>}
+export function JournalLoading(){return <div className="journal-loading">{Array.from({length:5},(_,i)=><i key={i}/>)}</div>}
+export function JournalEmptyState({filtered=false}:{filtered?:boolean}){return <div className="journal-empty"><span>✦</span><h2>{filtered?'Nenhuma crônica encontrada':'As primeiras páginas estão em branco'}</h2><p>{filtered?'Altere os filtros ou a pesquisa.':'Complete uma missão para começar sua lenda.'}</p></div>}

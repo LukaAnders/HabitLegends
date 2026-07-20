@@ -2,6 +2,7 @@ import { collection, doc, onSnapshot, orderBy, query, runTransaction, serverTime
 import { auth, db, requireFirebase } from '../lib/firebase'
 import type { PlayerProfile } from '../types/firebase'
 import type { InventoryItem, PurchaseResult, StoreItem } from '../types/store'
+import { createActivityLogEntry } from './activityLogService'
 
 export function subscribeToStoreItems(onData: (items: StoreItem[]) => void, onError: (error: Error) => void): Unsubscribe {
   const storeQuery = query(collection(requireFirebase(db, 'Cloud Firestore'), 'storeItems'), orderBy('price', 'asc'))
@@ -49,7 +50,10 @@ export async function purchaseItem(userId: string, itemId: string): Promise<Purc
       purchasedPrice: item.price,
       purchasedAt: serverTimestamp(),
       equipped: false,
+      avatarSlot: item.avatarSlot,
+      ...(item.avatarTransform ? { avatarTransform: item.avatarTransform } : {}),
     })
+    createActivityLogEntry(transaction, firestore, userId, { id: `item_purchased_${itemId}`, type: 'item_purchased', title: 'Artefato adquirido', description: `Você comprou ${item.name}.`, metadata: { itemId, itemName: item.name, rarity: item.rarity, category: item.category, gold: item.price }, createdAt: serverTimestamp() })
     return { item, newGold }
   })
 }
