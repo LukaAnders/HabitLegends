@@ -1,0 +1,10 @@
+import { motion } from 'framer-motion'
+import { Coins, Flame, Shield } from 'lucide-react'
+import { rarity, type Rarity } from '../data/gameData'
+
+export function RarityBadge({ value }: { value: Rarity }) { const style = rarity[value]; return <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.14em] ${style.text} ${style.border} ${style.bg}`}>{value}</span> }
+export function RewardDisplay({ xp, gold }: { xp: number; gold: number }) { return <div className="flex flex-wrap gap-2"><span className="reward-chip text-purple-200">✦ +{xp} XP</span><span className="reward-chip text-amber-200"><Coins size={13} />+{gold}</span></div> }
+export function LevelBadge({ level }: { level: number }) { return <div className="level-badge"><Shield size={15} /><span>NÍVEL</span><strong>{level}</strong></div> }
+export function GoldCounter({ value }: { value: number }) { return <motion.div animate={{ filter: ['brightness(1)', 'brightness(1.18)', 'brightness(1)'] }} transition={{ duration: 3, repeat: Infinity }} className="counter-medallion text-gold"><Coins size={18} /><strong>{value.toLocaleString('pt-BR')}</strong></motion.div> }
+export function StreakCounter({ value }: { value: number }) { return <div className="counter-medallion text-orange-300"><Flame size={18} /><strong>{value}</strong><span className="hidden sm:inline">dias</span></div> }
+export function XpBar({ value, max }: { value: number; max: number }) { const percent = Math.min(value / max * 100, 100); return <div className="w-full"><div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-widest text-purple-200"><span>Experiência</span><span className="normal-case tracking-normal text-parchment/80">{value.toLocaleString('pt-BR')} / {max.toLocaleString('pt-BR')} XP</span></div><div className="xp-shell"><motion.div initial={{ width: 0 }} animate={{ width: `${percent}%` }} transition={{ duration: 1.2, ease: 'easeOut' }} className="xp-fill" /><span className="xp-shine" /></div></div> }

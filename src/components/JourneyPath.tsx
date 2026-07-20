@@ -1,0 +1,5 @@
+import { motion } from 'framer-motion'
+import { Check, Lock } from 'lucide-react'
+import { journey } from '../data/gameData'
+
+export function JourneyPath() { return <section className="journey-panel"><div className="mb-6"><span className="eyebrow">Mapa da jornada</span><h2 className="section-heading">O caminho da lenda</h2></div><div className="journey-scroll">{journey.map((node, index) => { const Icon = node.icon; return <div key={node.name} className={`journey-node ${node.state}`}><div className="journey-marker">{node.state === 'completed' ? <Check size={18} /> : node.state === 'locked' ? <Lock size={15} /> : <motion.div animate={{ scale: [1, 1.12, 1] }} transition={{ repeat: Infinity, duration: 2 }}><Icon size={20} /></motion.div>}</div><div className="mt-3 w-28 text-center"><p className="font-display text-xs font-bold leading-tight text-parchment">{node.name}</p><span className="mt-1 block text-[9px] uppercase tracking-wider text-mist">{node.subtitle}</span></div>{index < journey.length - 1 && <div className="journey-line"><span /></div>}</div>})}</div></section> }
